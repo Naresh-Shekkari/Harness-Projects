@@ -1,0 +1,77 @@
+pipeline:
+  name: Core_Banking_Auth_CI_Pipeline
+  identifier: Core_Banking_Auth_CI_Pipeline
+  projectIdentifier: Retail_Banking
+  orgIdentifier: Enterprise_Banking_Org
+  tags:
+    domain: banking
+    service: auth-service
+  stages:
+    - stage:
+        name: Build_Test_and_Push_Image
+        identifier: Build_Test_and_Push_Image
+        type: CI
+        spec:
+          cloneCodebase: true
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: harness_k8s_delegate_connector
+              namespace: harness-ci-builds
+              resources:
+                limits:
+                  cpu: "2"
+                  memory: 4Gi
+          execution:
+            steps:
+              # Step 1: Run Unit Tests & Build Maven Package
+              - step:
+                  type: Run
+                  name: Maven_Build_and_Test
+                  identifier: Maven_Build_and_Test
+                  spec:
+                    connectorRef: dockerhub_connector
+                    image: maven:3.9.6-eclipse-temurin-17
+                    shell: Sh
+                    command: |-
+                      echo "Starting Maven Build & Unit Test Suite for Auth Service..."
+                      cd projects/01-core-banking-ci
+                      mvn clean test package
+                    reports:
+                      type: JUnit
+                      spec:
+                        paths:
+                          - "projects/01-core-banking-ci/target/surefire-reports/*.xml"
+
+              # Step 2: Build Docker Image & Push to DockerHub (Kaniko Daemonless Engine)
+              - step:
+                  type: BuildAndPushDockerRegistry
+                  name: Build_and_Push_to_DockerHub
+                  identifier: Build_and_Push_to_DockerHub
+                  spec:
+                    connectorRef: dockerhub_connector
+                    repo: nareshbanking/auth-service
+                    tags:
+                      - "<+pipeline.sequenceId>"
+                      - "latest"
+                    dockerfile: projects/01-core-banking-ci/Dockerfile
+                    context: projects/01-core-banking-ci
+                    optimize: true
+                    caching: true
+
+  triggers:
+    - trigger:
+        name: GitHub_Commit_Trigger
+        identifier: GitHub_Commit_Trigger
+        enabled: true
+        pipelineIdentifier: Core_Banking_Auth_CI_Pipeline
+        source:
+          type: Webhook
+          spec:
+            type: Github
+            event: Push
+            actions: []
+            connectorRef: github_banking_repo_connector
+            repoName: AGY
+            branches:
+              - main
