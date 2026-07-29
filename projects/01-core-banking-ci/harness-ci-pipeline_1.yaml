@@ -39,7 +39,7 @@ pipeline:
                   name: Maven_Build_and_Test
                   identifier: Maven_Build_and_Test
                   spec:
-                    connectorRef: account.harnessImage
+                    connectorRef: dockerhub_connector
                     image: maven:3.9.6-eclipse-temurin-17
                     shell: Sh
                     command: |-
@@ -56,7 +56,7 @@ pipeline:
                   name: Build_and_Push_to_DockerHub
                   identifier: Build_and_Push_to_DockerHub
                   spec:
-                    connectorRef: account.harnessImage
+                    connectorRef: dockerhub_connector
                     repo: nareshbanking/auth-service
                     tags:
                       - <+pipeline.sequenceId>
