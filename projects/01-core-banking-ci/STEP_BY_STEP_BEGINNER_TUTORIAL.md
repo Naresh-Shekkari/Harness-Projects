@@ -530,3 +530,5 @@ git push -u origin main
 ---
 
 > **Congratulations!** You now understand every component of this project from local code compilation to containerization and cloud-native CI/CD automation with Harness!
+
+To trigger the build pushed the changes to github.
