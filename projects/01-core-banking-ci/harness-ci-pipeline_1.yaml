@@ -18,6 +18,9 @@ pipeline:
             spec:
               connectorRef: github
               namespace: default
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
           execution:
             steps:
               - step:
