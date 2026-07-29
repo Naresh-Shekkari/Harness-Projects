@@ -16,7 +16,7 @@ pipeline:
           infrastructure:
             type: KubernetesDirect
             spec:
-              connectorRef: DockerHub_Connector
+              connectorRef: K8s_Build_Cluster
               namespace: default
               automountServiceAccountToken: true
               nodeSelector: {}
@@ -45,7 +45,7 @@ pipeline:
                     command: |-
                       echo "Starting Automated Maven Build & Test Suite..."
                       cd projects/01-core-banking-ci
-                      mvn clean test package                      
+                      mvn clean test package
                     reports:
                       type: JUnit
                       spec:
