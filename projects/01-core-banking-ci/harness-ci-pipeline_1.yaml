@@ -16,7 +16,7 @@ pipeline:
           infrastructure:
             type: KubernetesDirect
             spec:
-              connectorRef: github
+              connectorRef: DockerHub_Connector
               namespace: default
               automountServiceAccountToken: true
               nodeSelector: {}
