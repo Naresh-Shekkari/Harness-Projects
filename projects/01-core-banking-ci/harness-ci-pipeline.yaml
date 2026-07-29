@@ -17,7 +17,7 @@ pipeline:
               infrastructure:
                 type: KubernetesDirect
                 spec:
-                  connectorRef: GitHub   # Your Harness Delegate / Connector ID
+                  connectorRef: github   # Your Harness Delegate / Connector ID
                   namespace: default
               execution:
                 steps:
@@ -27,7 +27,7 @@ pipeline:
                       name: Clone_Banking_Repository
                       identifier: Clone_Banking_Repository
                       spec:
-                        connectorRef: GitHub
+                        connectorRef: github
                         repoName: Harness-Projects
                         build:
                           type: branch
