@@ -1,68 +1,63 @@
 pipeline:
-      name: Core_Banking_Auth_CI_Pipeline
-      identifier: Core_Banking_Auth_CI_Pipeline
-      projectIdentifier: default
-      orgIdentifier: default
-      tags:
-        domain: banking
-        service: auth-service
-      stages:
-        - stage:
-            name: Build_Test_and_Push_Image
-            identifier: Build_Test_and_Push_Image
-            type: CI
-            spec:
-              # Setting this to false bypasses the Harness UI Codebase check completely!
-              cloneCodebase: false
-              infrastructure:
-                type: KubernetesDirect
-                spec:
-                  connectorRef: github   # Your Harness Delegate / Connector ID
-                  namespace: default
-              execution:
-                steps:
-                  # Step 1: Explicit Git Clone Step
-                  - step:
-                      type: GitClone
-                      name: Clone_Banking_Repository
-                      identifier: Clone_Banking_Repository
+  name: Core_Banking_Auth_CI
+  identifier: Core_Banking_Auth_CI
+  projectIdentifier: default_project
+  orgIdentifier: default
+  tags:
+    domain: banking
+    service: auth-service
+  stages:
+    - stage:
+        name: Build_Test_and_Push_Image
+        identifier: Build_Test_and_Push_Image
+        type: CI
+        spec:
+          cloneCodebase: false
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: GitClone
+                  name: Clone_Banking_Repository
+                  identifier: Clone_Banking_Repository
+                  spec:
+                    connectorRef: github_connector
+                    repoName: Harness-Projects
+                    build:
+                      type: branch
                       spec:
-                        connectorRef: github
-                        repoName: Harness-Projects
-                        build:
-                          type: branch
-                          spec:
-                            branch: main
-    
-                  # Step 2: Run Unit Tests & Build Maven Package
-                  - step:
-                      type: Run
-                      name: Maven_Build_and_Test
-                      identifier: Maven_Build_and_Test
+                        branch: main
+              - step:
+                  type: Run
+                  name: Maven_Build_and_Test
+                  identifier: Maven_Build_and_Test
+                  spec:
+                    connectorRef: dockerhub_connector
+                    image: maven:3.9.6-eclipse-temurin-17
+                    shell: Sh
+                    command: |-
+                      echo "Starting Automated Maven Build & Test Suite..."
+                      cd Harness-Projects/projects/01-core-banking-ci
+                      mvn clean test package
+                    reports:
+                      type: JUnit
                       spec:
-                        connectorRef: dockerhub_connector
-                        image: maven:3.9.6-eclipse-temurin-17
-                        shell: Sh
-                        command: |-
-                          echo "Starting Automated Maven Build & Test Suite..."
-                          cd projects/01-core-banking-ci
-                          mvn clean test package                      
-                        reports:
-                          type: JUnit
-                          spec:
-                            paths:
-                              - "projects/01-core-banking-ci/target/surefire-reports/*.xml"
-    
-                  # Step 3: Build Docker Image & Push to DockerHub (Kaniko Engine)
-                  - step:
-                      type: BuildAndPushDockerRegistry
-                      name: Build_and_Push_to_DockerHub
-                      identifier: Build_and_Push_to_DockerHub
-                      spec:
-                        connectorRef: dockerhub_connector
-                        repo: nareshbanking/auth-service
-                        tags:
-                          - "<+pipeline.sequenceId>"
-                          - "latest"
-                        dockerfile: projects/01-core-banking-ci/Dockerfile
-                        context: projects/01-core-banking-ci
+                        paths:
+                          - Harness-Projects/projects/01-core-banking-ci/target/surefire-reports/*.xml
+              - step:
+                  type: BuildAndPushDockerRegistry
+                  name: Build_and_Push_to_DockerHub
+                  identifier: Build_and_Push_to_DockerHub
+                  spec:
+                    connectorRef: dockerhub_connector
+                    repo: naresh6961/auth-service
+                    tags:
+                      - <+pipeline.sequenceId>
+                      - latest
+                    dockerfile: Harness-Projects/projects/01-core-banking-ci/Dockerfile
+                    context: Harness-Projects/projects/01-core-banking-ci
