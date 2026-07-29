@@ -49,4 +49,12 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.authenticated").value(false))
                 .andExpect(jsonPath("$.message").value("Invalid credentials"));
     }
+
+    @Test
+    public void testServiceInfoEndpoint() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/info"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Core Banking User Authentication API"))
+                .andExpect(jsonPath("$.securityLevel").value("PCI-DSS Compliant"));
+    }
 }

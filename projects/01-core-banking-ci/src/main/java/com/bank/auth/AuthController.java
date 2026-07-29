@@ -12,7 +12,8 @@ public class AuthController {
         return Map.of(
             "status", "UP",
             "service", "Core-Banking-Auth-Service",
-            "version", "1.0.0"
+            "version", "1.0.1",
+            "environment", "production"
         );
     }
 
@@ -32,6 +33,15 @@ public class AuthController {
         return Map.of(
             "authenticated", false,
             "message", "Invalid credentials"
+        );
+    }
+
+    @GetMapping("/info")
+    public Map<String, String> getServiceInfo() {
+        return Map.of(
+            "name", "Core Banking User Authentication API",
+            "provider", "Retail Banking Division",
+            "securityLevel", "PCI-DSS Compliant"
         );
     }
 }
