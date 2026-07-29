@@ -217,11 +217,15 @@ The DevOps Engineer creates the declarative YAML specification that orchestrates
 pipeline:
   name: Core_Banking_Auth_CI_Pipeline
   identifier: Core_Banking_Auth_CI_Pipeline
-  projectIdentifier: Retail_Banking
-  orgIdentifier: Enterprise_Banking_Org
+  projectIdentifier: default
+  orgIdentifier: default
   tags:
     domain: banking
     service: auth-service
+  codebase:
+    connectorRef: github_connector
+    repoName: Harness-Projects
+    build: <+input>
   stages:
     - stage:
         name: Build_Test_and_Push_Image
@@ -230,14 +234,10 @@ pipeline:
         spec:
           cloneCodebase: true
           infrastructure:
-            type: KubernetesDirect
+            type: VM
             spec:
-              connectorRef: harness_k8s_delegate_connector
-              namespace: harness-ci-builds
-              resources:
-                limits:
-                  cpu: "2"
-                  memory: 4Gi
+              type: Docker
+              os: Linux
           execution:
             steps:
               # AUTOMATED STEP 1: Run Unit Tests & Build Maven Package
