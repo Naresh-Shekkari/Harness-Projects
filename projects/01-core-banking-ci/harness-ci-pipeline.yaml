@@ -57,7 +57,7 @@ pipeline:
                     connectorRef: dockerhub_connector
                     repo: naresh6961/auth-service
                     tags:
-                      - <+pipeline.sequenceId>
+                      - v2.0.<+pipeline.sequenceId>
                       - latest
                     dockerfile: Harness-Projects/projects/01-core-banking-ci/Dockerfile
                     context: Harness-Projects/projects/01-core-banking-ci
