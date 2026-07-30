@@ -122,3 +122,5 @@ pipeline:
 3. **Daemonless Container Builds**: Never run `docker build` in shell steps. Use Harness's native `BuildAndPushDockerRegistry` (Kaniko engine) for security and compatibility.
 4. **Semantic Versioning**: Combine `<+pipeline.sequenceId>` with major/minor version prefixing (`v2.0.<+pipeline.sequenceId>`) for release tracking.
 5. **Path Separators**: Always use Linux forward slashes (`/`) inside pipeline shell steps and configuration fields.
+6. **Docker Metadata Load Cancellation (`ERROR [internal] load metadata for docker.io/...`)**: Caused by unauthenticated Docker daemon session rate limits or port 443 network blocks. Fix: Run `Test-NetConnection -ComputerName registry-1.docker.io -Port 443` (Step 1) and `docker login` (Step 2).
+

@@ -96,3 +96,5 @@ Include a comprehensive matrix table detailing:
 - Setting `maxUnavailable: 1` vs `maxUnavailable: 0`
 - Setting `skipDryRun: true`
 - Missing `K8sRollingRollback` step
+- **Docker Image Metadata Load Cancellation (`ERROR [internal] load metadata for docker.io/...`)**: Caused by unauthenticated Docker daemon session rate limits or port 443 network blocks. Fix: Run `Test-NetConnection -ComputerName registry-1.docker.io -Port 443` (Step 1) and `docker login` (Step 2).
+
