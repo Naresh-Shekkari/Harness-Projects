@@ -1,0 +1,61 @@
+pipeline:
+  name: Core_Banking_Account_Statement_CD
+  identifier: Core_Banking_Account_Statement_CD
+  projectIdentifier: default_project
+  orgIdentifier: default
+  tags:
+    domain: banking
+    service: account-statement-service
+  stages:
+    - stage:
+        name: Deploy_Account_Statement_Service
+        identifier: Deploy_Account_Statement_Service
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: account_statement_service
+            serviceDefinition:
+              type: Kubernetes
+              spec:
+                manifests:
+                  - manifest:
+                      identifier: k8s_manifests
+                      type: K8sManifest
+                      spec:
+                        store:
+                          type: Github
+                          spec:
+                            connectorRef: github_connector
+                            gitFetchType: Branch
+                            branch: main
+                            paths:
+                              - Harness-Projects/projects/02-account-statement-cd/k8s/deployment.yaml
+                              - Harness-Projects/projects/02-account-statement-cd/k8s/service.yaml
+                artifacts:
+                  primary:
+                    type: DockerRegistry
+                    spec:
+                      connectorRef: dockerhub_connector
+                      path: naresh6961/account-statement-service
+                      tag: <+input>
+          environment:
+            environmentRef: production_k8s_env
+            deployToAll: false
+            infrastructureDefinitions:
+              - infrastructureDefinitionRef: k8s_cluster_infra
+          execution:
+            steps:
+              - step:
+                  type: K8sRollingDeploy
+                  name: Rollout_Deployment
+                  identifier: Rollout_Deployment
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+            rollbackSteps:
+              - step:
+                  type: K8sRollingRollback
+                  name: Rollback_Deployment
+                  identifier: Rollback_Deployment
+                  spec: {}
