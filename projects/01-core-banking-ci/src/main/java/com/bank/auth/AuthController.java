@@ -3,6 +3,7 @@ package com.bank.auth;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
+// added new line in the code in Controller class
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
