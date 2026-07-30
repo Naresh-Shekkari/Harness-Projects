@@ -1,14 +1,6 @@
----
-name: harness-test-scope-for-this-project
-description: >
-  Guide for complete project Test Scope. Manual Test Scope, Automation scope steps and within that which steps are related to Dev team steps and Which steps are related DevOps team - differentiate by adding the heading. So everyone can easily understand the scope of the test scenarios.
-  If any configurations are there explain with low level info, how to configure the setup step by step clearly point to point. If I missed what will happen that also explain.
-  commonly making mistakes also point out.
----
-
 # 🚀 Harness CD Kubernetes Rolling Update Deployment Blueprint
 
-> **Skill Purpose**: Encapsulates the standard Testing procedure (SOP), manual testing scope in local, automation test steps, differentiates dev scope vs devops scope, and detail low-level configuration steps with failure modes ("What If Missed") and common mistakes.
+> **Skill Execution Output**: Executed `harness-test-scope-for-this-project` for **Project 2: Customer Account Statement Service — Kubernetes CD Deployment**.
 
 ---
 
@@ -17,8 +9,8 @@ description: >
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 👨‍💻 DEVELOPER (DEV) TEAM SCOPE                                               │
-│ • Write Application Code & REST API Controller                             │
-│ • Write JUnit 5 & MockMvc Unit/Integration Tests                           │
+│ • Write Application Code & REST API Controller (`StatementController.java`)│
+│ • Write JUnit 5 & MockMvc Unit/Integration Tests (`StatementControllerTest`)│
 │ • Run Local Maven Build (`mvn clean test package`)                          │
 │ • Verify Local REST API (`http://localhost:8080/api/v1/statements/...`)    │
 └──────────────────────────────────────┬──────────────────────────────────────┘
@@ -42,7 +34,7 @@ description: >
 
 ### 🛠️ 1. Required Software Installations (Local Test Prerequisites)
 
-Install these 5 tools on your machine before running local testing:
+Install these 5 software tools on your local machine before running tests:
 
 | Tool | Required Version | Purpose | Verification Command |
 | :--- | :--- | :--- | :--- |
@@ -50,7 +42,7 @@ Install these 5 tools on your machine before running local testing:
 | **Apache Maven** | 3.9.0+ | Builds application & runs JUnit unit tests | `mvn -v` |
 | **Docker Desktop** | 4.25+ | Containerizes application locally | `docker --version` |
 | **Kubectl CLI** | 1.28+ | Tests & validates Kubernetes manifests | `kubectl version --client` |
-| **Kubernetes Cluster** | Minikube / Kind / Docker K8s | Local target K8s deployment environment | `kubectl get nodes` |
+| **Kubernetes Cluster** | Minikube / Kind / Docker K8s | Target K8s deployment environment | `kubectl get nodes` |
 
 ---
 
@@ -63,18 +55,17 @@ Navigate to `projects/02-account-statement-cd` and run:
 ```powershell
 mvn clean test
 ```
-* **What it tests**: Executes [`StatementControllerTest.java`](file:///C:/Users/Naresh/Documents/GitHub/AGY/projects/02-account-statement-cd/src/test/java/com/bank/statement/StatementControllerTest.java).
+* **What it tests**: Executes `StatementControllerTest.java`.
 * **Expected Output**: `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0` $\rightarrow$ **BUILD SUCCESS**.
-* **What If Missed**: Broken code or broken REST endpoints will be pushed to Git, causing CI/CD pipeline builds to fail downstream.
+* **What If Missed**: Broken REST endpoints or syntax errors will be pushed to Git, causing downstream CI/CD build failures.
 
 #### Step 2: Run Application Locally for Manual Testing
 ```powershell
 mvn spring-boot:run
 ```
-* **What it tests**: Boots Tomcat web server on port `8080`.
+* **What it tests**: Boots embedded Tomcat web server on port `8080`.
 
 #### Step 3: Manual Endpoint Verification (PowerShell / cURL)
-Open PowerShell or browser to test the REST endpoints manually:
 
 * **Test Health Endpoint**:
   ```powershell
@@ -82,7 +73,12 @@ Open PowerShell or browser to test the REST endpoints manually:
   ```
   * **Expected Output**:
     ```json
-    { "status": "UP", "service": "Customer-Account-Statement-Service", "version": "1.0.0" }
+    {
+      "status": "UP",
+      "service": "Customer-Account-Statement-Service",
+      "version": "1.0.0",
+      "environment": "Kubernetes-Deployment"
+    }
     ```
 
 * **Test Account Statement Endpoint**:
@@ -91,7 +87,13 @@ Open PowerShell or browser to test the REST endpoints manually:
   ```
   * **Expected Output**:
     ```json
-    { "accountNumber": "ACCT-889922", "customerName": "Jane Doe", "accountType": "Savings", "currentBalance": 12854.5 }
+    {
+      "accountNumber": "ACCT-889922",
+      "customerName": "Jane Doe",
+      "accountType": "Savings",
+      "currentBalance": 12854.5,
+      "currency": "USD"
+    }
     ```
 
 ---
@@ -100,7 +102,7 @@ Open PowerShell or browser to test the REST endpoints manually:
 
 The DevOps Team is responsible for container security, infrastructure manifests, and Harness CD pipeline orchestration.
 
-#### Step 1: Local Docker Container & Security Test
+#### Step 1: Local Docker Container & Non-Root Security Test
 ```powershell
 # 1. Build Multi-Stage Docker Image
 docker build -t account-statement-service:1.0 .
@@ -111,9 +113,9 @@ docker run -d -p 8080:8080 --name test-app account-statement-service:1.0
 # 3. Test Containerized REST Endpoint
 Invoke-RestMethod -Uri http://localhost:8080/api/v1/statements/health
 
-# 4. Audit Non-Root User Security
+# 4. Audit Non-Root User Security (Banking Compliance)
 docker exec test-app id
-# Expected Output: uid=1000(appuser) gid=1000(appgroup) -> Proves process is non-root!
+# Expected Output: uid=1000(appuser) gid=1000(appgroup) -> Proves process runs as non-root!
 
 # 5. Clean up local test container
 docker stop test-app ; docker rm test-app
@@ -129,7 +131,7 @@ kubectl apply -f k8s/deployment.yaml --dry-run=client
 kubectl apply -f k8s/service.yaml --dry-run=client
 ```
 * **Expected Output**: `validated (dry run)`.
-* **What If Missed**: Syntax errors or typos in YAML will cause the Harness CD pipeline to fail during deployment execution.
+* **What If Missed**: Syntax errors or typos in YAML will cause the Harness CD pipeline to crash during deployment execution.
 
 ---
 
@@ -143,14 +145,14 @@ Here is the step-by-step guide to configuring Harness SaaS for Kubernetes CD dep
 
 #### 1. Configure GitHub Connector (`github_connector`)
 * **Path in Harness UI**: **Account Settings** $\rightarrow$ **Connectors** $\rightarrow$ **+ New Connector** $\rightarrow$ **GitHub**.
-* **Configuration Details**:
+* **Low-Level Details**:
   * **URL**: `https://github.com/Naresh-Shekkari/Harness-Projects.git`
-  * **Authentication**: Username + Personal Access Token (`github_pat` secret).
-* **What If Missed**: Harness cannot pull `deployment.yaml` or `service.yaml` from GitHub. CD pipeline will fail with `PathNotFound` error.
+  * **Authentication**: Username + Personal Access Token (`github_pat` secret with `repo` and `admin:repo_hook` scopes).
+* **What If Missed**: Harness cannot pull `deployment.yaml` or `service.yaml` from GitHub. CD pipeline fails with `PathNotFound` error.
 
 #### 2. Configure DockerHub Connector (`dockerhub_connector`)
 * **Path in Harness UI**: **Account Settings** $\rightarrow$ **Connectors** $\rightarrow$ **+ New Connector** $\rightarrow$ **Docker Registry**.
-* **Configuration Details**:
+* **Low-Level Details**:
   * **Docker Registry URL**: `https://index.docker.io/v1/`
   * **Username**: `naresh6961`
   * **Password Secret**: `dockerhub_password` secret.
@@ -158,14 +160,14 @@ Here is the step-by-step guide to configuring Harness SaaS for Kubernetes CD dep
 
 #### 3. Configure Harness Service (`account_statement_service`)
 * **Path in Harness UI**: **Services** $\rightarrow$ **+ New Service**.
-* **Configuration Details**:
+* **Low-Level Details**:
   * **Deployment Type**: `Kubernetes`.
-  * **Manifests**: Add K8s Manifest pointing to `k8s/deployment.yaml` and `k8s/service.yaml` in GitHub.
+  * **Manifests**: Add K8s Manifest pointing to `k8s/deployment.yaml` and `k8s/service.yaml` in GitHub branch `main`.
   * **Artifacts**: Add Docker Registry artifact pointing to `naresh6961/account-statement-service` with tag `<+input>`.
 
 #### 4. Configure Harness Environment & Infrastructure (`production_k8s_env`)
 * **Path in Harness UI**: **Environments** $\rightarrow$ **+ New Environment**.
-* **Configuration Details**:
+* **Low-Level Details**:
   * **Environment Type**: `Production`.
   * **Infrastructure Definition**: Select `Kubernetes` cluster connector (`k8s_cluster_infra`) and namespace `default`.
 
