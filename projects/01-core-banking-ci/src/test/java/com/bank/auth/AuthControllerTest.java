@@ -45,7 +45,7 @@ public class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload))
-                .andExpect(status().isOk())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.authenticated").value(false))
                 .andExpect(jsonPath("$.message").value("Invalid credentials"));
     }
