@@ -593,12 +593,36 @@ Avoid these 7 common mistakes when setting up your Harness CI/CD pipelines. This
 
 ---
 
-### ❌ Mistake 7: Windows Backslashes in Linux Container Scripts
-* **Symptom**: `cd: projects\01-core-banking-ci: No such file or directory` during Harness pipeline execution.
-* **Root Cause**: Copying Windows PowerShell path syntax (`\`) into Harness script steps running on Linux containers.
-* **Solution**: Always use standard Linux forward slashes (`/`) in all Harness pipeline YAML scripts and configurations.
+### ❌ Mistake 8: Docker Image Metadata Load Cancellation (`ERROR [internal] load metadata for docker.io/...`)
+* **Symptom**:
+  ```text
+  ERROR [internal] load metadata for docker.io/library/maven:3.9.6-eclipse-temurin-17
+  CANCELED [internal] load metadata for docker.io/library/eclipse-temurin:17-jre-alpine
+  ```
+* **Root Cause**: Docker Daemon failed to complete the HTTPS pre-flight manifest handshake (Port 443) with DockerHub (`registry-1.docker.io`) due to unauthenticated session rate limits, active VPN/proxy barriers, or DNS resolution timeouts inside the Docker Engine daemon.
+
+#### 🔧 Step-by-Step Resolution Guide:
+
+### Step 1: Verify Internet & DockerHub Connectivity
+Run this command in PowerShell to check if your computer can reach DockerHub on port 443:
+```powershell
+Test-NetConnection -ComputerName registry-1.docker.io -Port 443
+```
+* **Expected Output**: `TcpTestSucceeded : True`.
+* **If False**: Your internet connection, VPN, or proxy is blocking DockerHub. Disconnect any active VPN and retry.
 
 ---
+
+### Step 2: Authenticate Docker CLI to DockerHub
+Logging into DockerHub grants higher API rate limits and bypasses anonymous throttling:
+```powershell
+docker login
+```
+* **Action**: Enter your DockerHub username (`naresh6961`) and DockerHub Personal Access Token / password.
+* **Result**: Authenticates your local Docker daemon session, preventing metadata pull cancellations and rate limiting.
+
+---
+
 
 ## 📌 Summary Cheat Sheet
 

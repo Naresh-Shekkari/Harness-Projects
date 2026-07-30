@@ -176,8 +176,43 @@
 
 ## ⚠️ Step 5: Common Mistakes & Troubleshooting Guide
 
-| # | Common Mistake | Consequence | Fix |
+| # | Common Mistake / Error | Consequence / Symptom | Fix / Solution |
 |---|---|---|---|
 | **1** | Hardcoding container image tag in `deployment.yaml` | Harness CD cannot deploy new image versions automatically. | Always use `<+artifact.tag>` expression in `deployment.yaml`. |
 | **2** | Omitting `readinessProbe` initial delay | K8s checks health before Spring Boot finishes booting, marking pods as failed. | Set `initialDelaySeconds: 15` on readiness probes. |
 | **3** | `maxUnavailable` left at default | K8s takes down active pods during rollout, causing brief downtime. | Explicitly set `maxUnavailable: 0` for banking zero-downtime. |
+| **4** | Docker Metadata Load Cancellation (`ERROR [internal] load metadata for docker.io/...`) | `docker build` fails/cancels while loading image manifests. | Perform Step 1 (Connectivity Test) & Step 2 (`docker login`) below. |
+
+---
+
+### 🚨 Detailed Troubleshooting: Docker Image Metadata Load Cancellation
+
+* **Error Output**:
+  ```text
+  ERROR [internal] load metadata for docker.io/library/maven:3.9.6-eclipse-temurin-17
+  CANCELED [internal] load metadata for docker.io/library/eclipse-temurin:17-jre-alpine
+  ```
+* **Root Cause**: Docker Daemon failed to complete the HTTPS pre-flight manifest handshake (Port 443) with DockerHub (`registry-1.docker.io`) due to unauthenticated session rate limits, active VPN/proxy barriers, or DNS resolution timeouts inside the Docker Engine daemon.
+
+---
+
+#### 🔧 Step-by-Step Resolution Guide:
+
+### Step 1: Verify Internet & DockerHub Connectivity
+Run this command in PowerShell to check if your computer can reach DockerHub on port 443:
+```powershell
+Test-NetConnection -ComputerName registry-1.docker.io -Port 443
+```
+* **Expected Output**: `TcpTestSucceeded : True`.
+* **If False**: Your internet connection, VPN, or proxy is blocking DockerHub. Disconnect any active VPN and retry.
+
+---
+
+### Step 2: Authenticate Docker CLI to DockerHub
+Logging into DockerHub grants higher API rate limits and bypasses anonymous throttling:
+```powershell
+docker login
+```
+* **Action**: Enter your DockerHub username (`naresh6961`) and DockerHub Personal Access Token / password.
+* **Result**: Authenticates your local Docker daemon session, preventing metadata pull cancellations and rate limiting.
+
