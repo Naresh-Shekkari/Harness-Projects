@@ -14,7 +14,8 @@
 5. [Step 4: Containerizing with Docker](#step-4-containerizing-with-docker)
 6. [Step 5: Understanding & Setting Up Harness CI](#step-5-understanding--setting-up-harness-ci)
 7. [Step 6: Version Control with Git & Pushing to GitHub](#step-6-version-control-with-git--pushing-to-github)
-8. [Summary Cheat Sheet](#summary-cheat-sheet)
+8. [Step 7: Common Mistakes, Pitfalls & Troubleshooting Guide](#step-7-common-mistakes-pitfalls--troubleshooting-guide)
+9. [Summary Cheat Sheet](#summary-cheat-sheet)
 
 ---
 
@@ -402,70 +403,77 @@ In a real company:
 
 ### The Harness Pipeline Specification (`harness-ci-pipeline.yaml`)
 
-This YAML file tells Harness exactly how to automate the build:
+This YAML file tells Harness exactly how to automate the build, test, and container packaging process:
 
 ```yaml
 pipeline:
-  name: Core_Banking_Auth_CI_Pipeline
-  identifier: Core_Banking_Auth_CI_Pipeline
-  projectIdentifier: Retail_Banking
-  orgIdentifier: Enterprise_Banking_Org
+  name: Core_Banking_Auth_CI
+  identifier: Core_Banking_Auth_CI
+  projectIdentifier: default_project
+  orgIdentifier: default
+  tags:
+    domain: banking
+    service: auth-service
   stages:
     - stage:
         name: Build_Test_and_Push_Image
         identifier: Build_Test_and_Push_Image
         type: CI
         spec:
-          cloneCodebase: true
-          infrastructure:
-            type: KubernetesDirect
-            spec:
-              connectorRef: harness_k8s_delegate_connector
-              namespace: harness-ci-builds
+          cloneCodebase: false
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
           execution:
             steps:
-              # Step 1: Run Unit Tests & Build Jar
+              # Step 1: Explicit Git Clone step
+              - step:
+                  type: GitClone
+                  name: Clone_Banking_Repository
+                  identifier: Clone_Banking_Repository
+                  spec:
+                    connectorRef: github_connector
+                    repoName: Harness-Projects
+                    build:
+                      type: branch
+                      spec:
+                        branch: main
+
+              # Step 2: Run Unit Tests & Build Jar
               - step:
                   type: Run
                   name: Maven_Build_and_Test
+                  identifier: Maven_Build_and_Test
                   spec:
                     connectorRef: dockerhub_connector
                     image: maven:3.9.6-eclipse-temurin-17
+                    shell: Sh
                     command: |-
-                      cd projects/01-core-banking-ci
+                      echo "Starting Automated Maven Build & Test Suite..."
+                      cd Harness-Projects/projects/01-core-banking-ci
                       mvn clean test package
                     reports:
                       type: JUnit
                       spec:
                         paths:
-                          - "projects/01-core-banking-ci/target/surefire-reports/*.xml"
+                          - Harness-Projects/projects/01-core-banking-ci/target/surefire-reports/*.xml
 
-              # Step 2: Build & Push Docker Image (Daemonless Kaniko Engine)
+              # Step 3: Build & Push Docker Image (Daemonless Kaniko Engine)
               - step:
                   type: BuildAndPushDockerRegistry
                   name: Build_and_Push_to_DockerHub
+                  identifier: Build_and_Push_to_DockerHub
                   spec:
                     connectorRef: dockerhub_connector
-                    repo: nareshbanking/auth-service
+                    repo: naresh6961/auth-service
                     tags:
-                      - "<+pipeline.sequenceId>"
-                      - "latest"
-                    dockerfile: projects/01-core-banking-ci/Dockerfile
-                    context: projects/01-core-banking-ci
-
-  triggers:
-    - trigger:
-        name: GitHub_Commit_Trigger
-        enabled: true
-        source:
-          type: Webhook
-          spec:
-            type: Github
-            event: Push
-            connectorRef: github_banking_repo_connector
-            repoName: Harness-Projects
-            branches:
-              - main
+                      - v2.0.<+pipeline.sequenceId>
+                      - latest
+                    dockerfile: Harness-Projects/projects/01-core-banking-ci/Dockerfile
+                    context: Harness-Projects/projects/01-core-banking-ci
 ```
 
 ---
@@ -509,26 +517,101 @@ git branch -M main
 # Pull remote README if present and rebase
 git pull origin main --rebase
 
-# Push code to GitHub
+# Push code to GitHub (triggers Harness CI pipeline automatically via Webhook)
 git push -u origin main
 ```
 
 ---
 
-## 📌 Summary Cheat Sheet
+## ⚠️ Step 7: Common Mistakes, Pitfalls & Troubleshooting Guide
 
-| Task | Command |
-| :--- | :--- |
-| **Run Unit Tests** | `mvn clean test` |
-| **Run Application Locally** | `mvn spring-boot:run` |
-| **Build Docker Image** | `docker build -t auth-service:1.0 .` |
-| **Run Docker Container** | `docker run -p 8080:8080 auth-service:1.0` |
-| **Check Git Status** | `git status` |
-| **Push Code Changes** | `git add . ; git commit -m "msg" ; git push` |
-| **Test Endpoint in PowerShell** | `Invoke-RestMethod -Uri http://localhost:8080/api/v1/auth/health` |
+Avoid these 7 common mistakes when setting up your Harness CI/CD pipelines. This guide will save you hours of debugging!
+
+### ❌ Mistake 1: Workspace Path Mismatch in Multi-Project / Monorepo Subfolders
+* **Symptom**: Kaniko fails with `Dockerfile does not exist` or Maven fails with `pom.xml not found`.
+* **Root Cause**: When Harness clones a GitHub repository, it creates a root workspace folder matching the repository name (`Harness-Projects/`). If your commands or step specs use relative paths like `projects/01-core-banking-ci`, the agent looks inside `projects/` at the root instead of inside `Harness-Projects/projects/`.
+* **Solution**: Always prefix subfolder paths with the cloned repository folder name in `command`, `context`, `dockerfile`, and JUnit report `paths`:
+  ```yaml
+  dockerfile: Harness-Projects/projects/01-core-banking-ci/Dockerfile
+  context: Harness-Projects/projects/01-core-banking-ci
+  command: cd Harness-Projects/projects/01-core-banking-ci && mvn clean test package
+  ```
 
 ---
 
-> **Congratulations!** You now understand every component of this project from local code compilation to containerization and cloud-native CI/CD automation with Harness!
+### ❌ Mistake 2: DockerHub Repository Naming & Access Denied (`403 Forbidden`)
+* **Symptom**: `BuildAndPushDockerRegistry` step fails with `403 Forbidden: access denied` or `denied: requested access to the resource is denied`.
+* **Root Cause**: Specifying only the image name (`auth-service`) or using a different username than the authenticated DockerHub connector (`wronguser/auth-service`).
+* **Solution**: The `repo:` parameter **must** follow the format `<dockerhub-username>/<repository-name>` matching the account tied to your `dockerhub_connector` secret:
+  ```yaml
+  repo: naresh6961/auth-service
+  ```
 
-To trigger the build pushed the changes to github.
+---
+
+### ❌ Mistake 3: Overwriting Container Image Tags (`latest` only)
+* **Symptom**: Deployments cannot roll back to previous releases, or builds overwrite production images.
+* **Root Cause**: Using fixed image tags (e.g., `latest` or `1.0`) for every build.
+* **Solution**: Use dynamic Harness variables to generate unique, immutable semantic versions for every build while maintaining a `latest` pointer for convenience:
+  ```yaml
+  tags:
+    - v2.0.<+pipeline.sequenceId>
+    - latest
+  ```
+
+---
+
+### ❌ Mistake 4: Missing JUnit XML Report Path Configuration
+* **Symptom**: Unit tests pass in Maven, but Harness UI shows **"0 Tests Executed"** or fails to produce test trend graphs.
+* **Root Cause**: Specifying a default path like `target/surefire-reports/*.xml` without taking the cloned repo subfolder into account.
+* **Solution**: Point the `reports` specification to the exact XML location generated by Maven:
+  ```yaml
+  reports:
+    type: JUnit
+    spec:
+      paths:
+        - Harness-Projects/projects/01-core-banking-ci/target/surefire-reports/*.xml
+  ```
+
+---
+
+### ❌ Mistake 5: GitHub Webhook Triggers Silent Failures
+* **Symptom**: `git push` succeeds in terminal, but Harness CI pipeline never starts automatically.
+* **Root Cause**: 
+  1. The GitHub PAT secret missing `admin:repo_hook` permissions.
+  2. Branch filter in trigger set to `master` while remote repo default branch is `main`.
+* **Solution**:
+  - Ensure GitHub PAT has `repo` and `admin:repo_hook` scopes.
+  - Check webhook delivery logs in GitHub: **Repo Settings** $\rightarrow$ **Webhooks** $\rightarrow$ Select Harness Webhook $\rightarrow$ view **Recent Deliveries** (must return `200 OK`).
+
+---
+
+### ❌ Mistake 6: Trying to Run `docker build` Directly in CI Runners
+* **Symptom**: `docker: command not found` or `Cannot connect to the Docker daemon at unix:///var/run/docker.sock`.
+* **Root Cause**: Standard CI steps run inside unprivileged containers without a running Docker daemon or socket access.
+* **Solution**: Do not write custom `docker build` shell commands. Use Harness's native step `type: BuildAndPushDockerRegistry`. It uses **Kaniko**, a daemonless container image builder specifically designed for secure, unprivileged Kubernetes and cloud environments.
+
+---
+
+### ❌ Mistake 7: Windows Backslashes in Linux Container Scripts
+* **Symptom**: `cd: projects\01-core-banking-ci: No such file or directory` during Harness pipeline execution.
+* **Root Cause**: Copying Windows PowerShell path syntax (`\`) into Harness script steps running on Linux containers.
+* **Solution**: Always use standard Linux forward slashes (`/`) in all Harness pipeline YAML scripts and configurations.
+
+---
+
+## 📌 Summary Cheat Sheet
+
+| Task | Local PowerShell Command | Harness CI Equivalent Step |
+| :--- | :--- | :--- |
+| **Run Unit Tests** | `mvn clean test` | `Run` step (`mvn clean test package`) |
+| **Build Docker Image** | `docker build -t auth-service:1.0 .` | `BuildAndPushDockerRegistry` (Kaniko) |
+| **Push Container Image** | `docker push naresh6961/auth-service:latest` | `BuildAndPushDockerRegistry` (`connectorRef: dockerhub_connector`) |
+| **Trigger Pipeline** | N/A | GitHub Webhook Trigger on `git push origin main` |
+| **Check Git Status** | `git status` | N/A |
+| **Push Code Changes** | `git add . ; git commit -m "msg" ; git push` | Triggers Harness build automatically |
+| **Test Endpoint** | `Invoke-RestMethod -Uri http://localhost:8080/api/v1/auth/health` | Automated by test suite / post-deploy checks |
+
+---
+
+> **Congratulations!** You now have a complete, production-ready reference guide covering setup, implementation, pipeline YAML configuration, and troubleshooting best practices for Harness CI/CD!
