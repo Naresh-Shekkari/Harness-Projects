@@ -124,14 +124,83 @@ docker stop test-app ; docker rm test-app
 #### Step 2: Kubernetes Manifest Dry-Run Validation
 Validate K8s manifests before committing to GitHub:
 ```powershell
-# Validate Deployment Manifest Syntax
+# Validate Deployment Manifest Syntax (Online - Requires Active Cluster)
 kubectl apply -f k8s/deployment.yaml --dry-run=client
 
+# Validate Deployment Manifest Syntax (Offline - No Cluster Required)
+kubectl apply -f k8s/deployment.yaml --dry-run=client --validate=false
+
 # Validate Service Manifest Syntax
-kubectl apply -f k8s/service.yaml --dry-run=client
+kubectl apply -f k8s/service.yaml --dry-run=client --validate=false
 ```
-* **Expected Output**: `validated (dry run)`.
+* **Expected Output**: `deployment.apps/account-statement-service created (dry run)`.
 * **What If Missed**: Syntax errors or typos in YAML will cause the Harness CD pipeline to crash during deployment execution.
+
+---
+
+## 🐋 Kind (Kubernetes in Docker) Operational & Troubleshooting Guide
+
+As a DevOps Engineer, when testing Kubernetes deployments locally with **Kind**, you may encounter environment handshake issues. Follow this standard operating procedure (SOP) to diagnose and resolve Kind cluster errors.
+
+---
+
+### 🚨 Problem 1: `kubectl` Connection Refused (`dial tcp [::1]:8080: connectex`)
+
+#### Symptom:
+```text
+error: error validating "k8s/deployment.yaml": error validating data: failed to download openapi: 
+Get "http://localhost:8080/openapi/v2?timeout=32s": dial tcp [::1]:8080: connectex: 
+No connection could be made because the target machine actively refused it.
+```
+
+#### Low-Level Root Cause:
+`kubectl` attempts to download OpenAPI schema specifications from the Kubernetes API Server to perform client-side validation. When Docker Desktop is stopped, no Kind cluster exists, or `kubectl` is not bound to the `kind-kind` context, `kubectl` falls back to `http://localhost:8080`. Since no API server is listening on port 8080, the Windows OS TCP stack rejects the connection (`WSAECONNREFUSED`).
+
+---
+
+#### 🔧 5-Step Kind Diagnostics & Resolution SOP:
+
+```powershell
+# Step 1: Verify Docker Desktop Engine is Running
+docker ps
+# If error "error during connect", launch Docker Desktop from Windows Start menu.
+
+# Step 2: Verify Existing Kind Clusters
+kind get clusters
+# Returns the list of active Kind clusters.
+
+# Step 3: Create Kind Cluster (If None Exists)
+kind create cluster --name kind
+# Creates a Kubernetes control-plane container running inside Docker.
+
+# Step 4: Bind kubectl to Kind Context
+kubectl config use-context kind-kind
+
+# Step 5: Verify Cluster Control Plane API Handshake
+kubectl cluster-info
+```
+
+* **Expected `kubectl cluster-info` Output**:
+  ```text
+  Kubernetes control plane is running at https://127.0.0.1:XXXXX
+  CoreDNS is running at https://127.0.0.1:XXXXX/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+  ```
+
+---
+
+### 🚨 Problem 2: Loading Local Container Images into Kind
+
+#### Symptom:
+`ErrImagePull` or `ImagePullBackOff` when deploying local Docker images (`account-statement-service:1.0`) to Kind.
+
+#### Low-Level Root Cause:
+Kind runs inside isolated Docker container nodes. The Kind cluster cannot see images built on your local host Docker engine unless explicitly loaded into the Kind image store.
+
+#### 🔧 Fix: Direct Image Ingestion Command
+```powershell
+# Load host Docker image directly into Kind cluster node
+kind load docker-image account-statement-service:1.0 --name kind
+```
 
 ---
 
@@ -189,3 +258,6 @@ Here is the step-by-step guide to configuring Harness SaaS for Kubernetes CD dep
 | **3** | **Setting `maxUnavailable: 1` in Deployment** | During rollout, K8s kills 1 active pod before new pod is ready, causing 503 HTTP Service Unavailable errors for active customers. | Set `maxUnavailable: 0` for 100% zero-downtime banking compliance. |
 | **4** | **Setting `skipDryRun: true`** | Harness skips K8s server-side YAML validation, allowing malformed manifests to crash the deployment mid-stream. | **Set `skipDryRun: false`** so Harness validates YAML via K8s API server before starting rollout. |
 | **5** | **Missing `K8sRollingRollback` Step** | If a bad deployment occurs, Harness halts but leaves the cluster in a broken state without restoring the previous working release. | Always configure `K8sRollingRollback` in the pipeline `rollbackSteps` section. |
+| **6** | **Kind Cluster API Connection Refused (`localhost:8080`)** | `kubectl` cannot reach K8s API server because Docker Desktop is down or context is not set to `kind-kind`. | Ensure Docker is up (`docker ps`), create Kind cluster (`kind create cluster --name kind`), and set context (`kubectl config use-context kind-kind`). Or use `--validate=false` for offline dry run. |
+| **7** | **`ErrImagePull` on Kind Cluster** | Kind cannot pull locally built Docker image because it's stored on host engine, not inside Kind container node. | Run `kind load docker-image account-statement-service:1.0 --name kind` to ingest host image into Kind nodes. |
+
